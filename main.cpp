@@ -6,22 +6,23 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <linux/fb.h>
 
-#include <exception>
 
+// Ion video header from drivers\staging\android\uapi\ion.h
+#include "ion.h"
+#include "meson_ion.h"
+#include "ge2d.h"
+#include "ge2d_cmd.h"
 
-class Exception : public std::exception
-{
-public:
-	Exception(const char* message)
-		: std::exception()
-	{
-		fprintf(stderr, "%s\n", message);
-	}
+#include "IonBuffer.h"
+#include "ge2d.h"
+#include "ge2d_cmd.h"
 
-};
+#include <memory>
+
 
 
 int main()
@@ -74,6 +75,29 @@ int main()
 	printf("fb2: screen info - width=%d, height=%d, bpp=%d\n", fb2width, fb2height, fb2bpp);
 
 
+	// GE2D
+	int ge2d_fd = open("/dev/ge2d", O_RDWR);
+	if (ge2d_fd < 0)
+	{
+		throw Exception("open /dev/ge2d failed.");
+	}
+
+
+	// Ion
+	std::shared_ptr<IonBuffer> lcdBuffer = std::make_shared<IonBuffer>(fb2dataLen);
+
+	void* lcdBufferPtr = mmap(NULL,
+		lcdBuffer->Length(),
+		PROT_READ | PROT_WRITE,
+		MAP_FILE | MAP_SHARED,
+		lcdBuffer->ExportHandle(),
+		0);
+	if (!lcdBufferPtr)
+	{
+		throw Exception("lcdBufferPtr mmap failed.");
+	}
+
+
 	// -- mmap
 	uint32_t* fb0mem = (uint32_t*)mmap(0, fb0dataLen, PROT_WRITE | PROT_READ, MAP_SHARED, fb0fd, 0);
 	if (fb0mem == MAP_FAILED)
@@ -112,8 +136,8 @@ int main()
 	// LCD = RGB565
 	// HDMI = ARGB32
 
-#if 1
-	while (true)
+#if 0
+	//while (true)
 	{
 		// -- copy
 		for (int y = 0; y < fb2height; ++y)
@@ -143,6 +167,70 @@ int main()
 			}
 		}
 	}
+#endif
+
+
+#if 1
+
+	// Configure GE2D
+	struct config_para_ex_s configex = { 0 };
+
+	configex.src_para.mem_type = CANVAS_OSD0;
+	configex.src_para.format = GE2D_FORMAT_S32_ARGB;
+	//configex.src_para.canvas_index = src_index;
+	configex.src_para.left = 0;
+	configex.src_para.top = 0;
+	configex.src_para.width = fb0width;
+	configex.src_para.height = fb0height;
+
+	configex.src2_para.mem_type = CANVAS_TYPE_INVALID;
+
+	configex.dst_para.mem_type = CANVAS_ALLOC;
+	configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+	configex.dst_para.left = 0;
+	configex.dst_para.top = 0;
+	configex.dst_para.width = fb2width;
+	configex.dst_para.height = fb2height;
+	configex.dst_planes[0].addr = lcdBuffer->PhysicalAddress();
+	configex.dst_planes[0].w = fb2width;
+	configex.dst_planes[0].h = fb2height;
+
+	io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
+	if (io < 0)
+	{
+		throw Exception("GE2D_CONFIG_EX failed.\n");
+	}
+
+
+	ge2d_para_s blitRect = { 0 };
+
+	blitRect.src1_rect.x = 0;
+	blitRect.src1_rect.y = 0;
+	blitRect.src1_rect.w = fb0width;
+	blitRect.src1_rect.h = fb0height;
+
+	blitRect.dst_rect.x = 0;
+	blitRect.dst_rect.y = 0;
+	blitRect.dst_rect.w = fb2width;
+	blitRect.dst_rect.h = fb2height;
+
+
+	while (true)
+	{
+		// Color conversion
+		io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
+		if (io < 0)
+		{
+			throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
+		}
+
+		//printf("GE2D Blit OK.\n");
+
+
+		// copy
+		memcpy(fb2mem, lcdBufferPtr, lcdBuffer->BufferSize());
+	}
+
 #endif
 
 	// -- Terminate
