@@ -66,6 +66,15 @@ int main()
 		throw Exception("fb2: FBIOGET_VSCREENINFO failed.");
 	}
 
+	//struct fb_fix_screeninfo fb2fixinfo;
+	//io = ioctl(fb2fd, FBIOGET_FSCREENINFO, &fb2fixinfo);
+	//if (io < 0)
+	//{
+	//	throw Exception("fb2: FBIOGET_FSCREENINFO failed.");
+	//}
+
+	//printf("fb2: smem_start=%lu\n", fb2fixinfo.smem_start);
+
 
 	int fb2width = fb2info.xres;
 	int fb2height = fb2info.yres;
@@ -217,6 +226,13 @@ int main()
 
 	while (true)
 	{
+		// wait for vsync
+		io = ioctl(fb0fd, FBIO_WAITFORVSYNC, 0);
+		if (io < 0)
+		{
+			throw Exception("FBIO_WAITFORVSYNC failed.");
+		}
+
 		// Color conversion
 		io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
 		if (io < 0)
