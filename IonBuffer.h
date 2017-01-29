@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 
 #include "ion.h"
 #include "meson_ion.h"
@@ -171,5 +172,21 @@ public:
 		}
 #endif
 
+	}
+
+	void* Map()
+	{
+		void* result = mmap(NULL,
+			Length(),
+			PROT_READ | PROT_WRITE,
+			MAP_FILE | MAP_SHARED,
+			ExportHandle(),
+			0);
+		if (result == MAP_FAILED)
+		{
+			throw Exception("mmap failed.");
+		}
+
+		return result;
 	}
 };

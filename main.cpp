@@ -3,131 +3,18 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <linux/fb.h>
-
-
-// Ion video header from drivers\staging\android\uapi\ion.h
 #include "ion.h"
 #include "meson_ion.h"
 #include "ge2d.h"
 #include "ge2d_cmd.h"
 
 #include "IonBuffer.h"
-#include "ge2d.h"
-#include "ge2d_cmd.h"
-
-#include <memory>
-#include <string>
-
-
-class FrameBuffer
-{
-	std::string deviceName;
-	int fd;
-	int width;
-	int height;
-	int bpp;
-	int length;
-	void* data;
-
-
-public:
-
-	const std::string& DeviceName() const
-	{
-		return deviceName;
-	}
-
-	int FileDescriptor() const
-	{
-		return fd;
-	}
-
-	int Width() const
-	{
-		return width;
-	}
-
-	int Height() const
-	{
-		return height;
-	}
-
-	int BitsPerPixel() const
-	{
-		return bpp;
-	}
-
-	int Length() const
-	{
-		return length;
-	}
-
-	void* Data() const
-	{
-		return data;
-	}
-
-
-
-	FrameBuffer(const char* deviceName)
-	{
-		if (deviceName == nullptr)
-		{
-			throw Exception("bad device name");
-		}
-
-
-		this->deviceName = deviceName;
-
-
-		fd = open(deviceName, O_RDWR);
-		if (fd < 0)
-		{
-			throw Exception("open failed.");
-		}
-
-		
-		int io;
-		struct fb_var_screeninfo info;
-
-		io = ioctl(fd, FBIOGET_VSCREENINFO, &info);
-		if (io < 0)
-		{
-			throw Exception("FBIOGET_VSCREENINFO failed.");
-		}
-
-
-		width = info.xres;
-		height = info.yres;
-		bpp = info.bits_per_pixel;
-		length = width * height * (bpp / 8);
-
-
-		data = mmap(0, length, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-		if (data == MAP_FAILED)
-		{
-			throw Exception("mmap failed");
-		}
-	}
-
-	~FrameBuffer()
-	{
-		int r = munmap(data, length);
-		if (r != 0)
-		{
-			throw Exception("munmap failed.");
-		}
-
-		close(fd);
-	}
-};
-
+#include "FrameBuffer.h"
 
 
 int main()
@@ -158,16 +45,7 @@ int main()
 	// Ion
 	IonBuffer lcdBuffer(fb2.Length());
 
-	void* lcdBufferPtr = mmap(NULL,
-		lcdBuffer.Length(),
-		PROT_READ | PROT_WRITE,
-		MAP_FILE | MAP_SHARED,
-		lcdBuffer.ExportHandle(),
-		0);
-	if (!lcdBufferPtr)
-	{
-		throw Exception("lcdBufferPtr mmap failed.");
-	}
+	void* lcdBufferPtr = lcdBuffer.Map();
 
 
 	// Clear the LCD display
@@ -251,11 +129,7 @@ int main()
 	while (true)
 	{
 		// Wait for VSync
-		io = ioctl(fb0.FileDescriptor(), FBIO_WAITFORVSYNC, 0);
-		if (io < 0)
-		{
-			throw Exception("FBIO_WAITFORVSYNC failed.");
-		}
+		fb0.WaitForVSync();
 
 		// Color conversion
 		io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
