@@ -3,10 +3,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <getopt.h>
 
 #include "ion.h"
 #include "meson_ion.h"
@@ -17,9 +17,62 @@
 #include "FrameBuffer.h"
 
 
-int main()
+struct option longopts[] = {
+	{ "aspect",			required_argument,  NULL,          'a' },
+	{ 0, 0, 0, 0 }
+};
+
+
+void ShowUsage()
+{
+	printf("Usage: c2screen2lcd [OPTIONS]\n");
+	printf("Displays main framebuffer on LCD shield.\n\n");
+
+	printf("  -a, --aspect h:w\tForce aspect ratio\n");
+}
+
+
+int main(int argc, char** argv)
 {
 	int io;
+
+
+	// options
+	int c;
+	float aspect = -1;
+
+	while ((c = getopt_long(argc, argv, "a:", longopts, NULL)) != -1)
+	{
+		switch (c)
+		{
+			case 'a':
+			{
+				if (strchr(optarg, ':'))
+				{
+					unsigned int h;
+					unsigned int w;
+					double s;
+					if (sscanf(optarg, "%u:%u", &h, &w) == 2)
+					{
+						aspect = (float)h / (float)w;
+					}
+					else
+					{
+						throw Exception("invalid aspect");
+					}
+				}
+				else
+				{
+					aspect = atof(optarg);
+				}
+			}
+			break;
+
+			default:
+				ShowUsage();
+				exit(EXIT_FAILURE);
+		}
+	}
 
 
 	// HDMI (ARGB32)
@@ -89,7 +142,7 @@ int main()
 			throw Exception("fb0 bits per pixel not supported");
 	}
 
-	configex.src_para.mem_type = CANVAS_OSD0;	
+	configex.src_para.mem_type = CANVAS_OSD0;
 	configex.src_para.left = 0;
 	configex.src_para.top = 0;
 	configex.src_para.width = fb0.Width();
@@ -114,6 +167,46 @@ int main()
 	}
 
 
+	// Aspect ratio
+	const float LCD_ASPECT = 1.5f;	// LCD aspect = 3:2 = 1.5
+
+	// If no aspect ratio was specified, calculate it
+	if (aspect == -1)
+	{
+		aspect = (float)fb0.Width() / (float)fb0.Height();
+	}
+
+	int dstX;
+	int dstY;
+	int dstWidth;
+	int dstHeight;
+
+	if (aspect == LCD_ASPECT)
+	{
+		dstWidth = fb2.Width();
+		dstHeight = fb2.Height();
+		dstX = 0;
+		dstY = 0;
+	}
+	else if (aspect < LCD_ASPECT)
+	{
+		dstWidth = fb2.Height() * aspect;
+		dstHeight = fb2.Height();
+		dstX = (fb2.Width() / 2) - (dstWidth / 2);
+		dstY = 0;
+	}
+	else
+	{
+		dstWidth = fb2.Width();
+		dstHeight = fb2.Width() * (1.0f / aspect);
+		dstX = 0;
+		dstY = (fb2.Height() / 2) - (dstHeight / 2);
+	}
+
+	printf("aspect=%f\n", aspect);
+
+
+	//  Blit rectangle
 	ge2d_para_s blitRect = { 0 };
 
 	blitRect.src1_rect.x = 0;
@@ -121,10 +214,10 @@ int main()
 	blitRect.src1_rect.w = fb0.Width();
 	blitRect.src1_rect.h = fb0.Height();
 
-	blitRect.dst_rect.x = 0;
-	blitRect.dst_rect.y = 0;
-	blitRect.dst_rect.w = fb2.Width();
-	blitRect.dst_rect.h = fb2.Height();
+	blitRect.dst_rect.x = dstX;
+	blitRect.dst_rect.y = dstY;
+	blitRect.dst_rect.w = dstWidth;
+	blitRect.dst_rect.h = dstHeight;
 
 
 	while (true)
