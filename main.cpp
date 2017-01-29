@@ -31,6 +31,11 @@ int main()
 	FrameBuffer fb2("/dev/fb2");
 	printf("fb2: screen info - width=%d, height=%d, bpp=%d\n", fb2.Width(), fb2.Height(), fb2.BitsPerPixel());
 
+	if (fb2.BitsPerPixel() != 16)
+	{
+		throw Exception("Unexpected fb2 bits per pixel");
+	}
+
 
 	// GE2D
 	int ge2d_fd = open("/dev/ge2d", O_RDWR);
@@ -69,7 +74,11 @@ int main()
 	switch (fb0.BitsPerPixel())
 	{
 		case 16:
-			configex.src_para.format = GE2D_FORMAT_S32_ARGB;
+			configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
+			break;
+
+		case 24:
+			configex.src_para.format = GE2D_FORMAT_S24_RGB;
 			break;
 
 		case 32:
