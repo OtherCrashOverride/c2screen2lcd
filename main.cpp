@@ -22,15 +22,13 @@ int main()
 	int io;
 
 
-	// -- open fb0
+	// HDMI (ARGB32)
 	FrameBuffer fb0("/dev/fb0");
-	
 	printf("fb0: screen info - width=%d, height=%d, bpp=%d\n", fb0.Width(), fb0.Height(), fb0.BitsPerPixel());
 
 
-	// -- open fb2
+	// LCD (RGB565)
 	FrameBuffer fb2("/dev/fb2");
-
 	printf("fb2: screen info - width=%d, height=%d, bpp=%d\n", fb2.Width(), fb2.Height(), fb2.BitsPerPixel());
 
 
@@ -44,7 +42,6 @@ int main()
 
 	// Ion
 	IonBuffer lcdBuffer(fb2.Length());
-
 	void* lcdBufferPtr = lcdBuffer.Map();
 
 
@@ -64,11 +61,6 @@ int main()
 			fb2mem[offset] = 0xffff;	// White
 		}
 	}
-
-
-	// Color spaces:
-	//   LCD = RGB565
-	//   HDMI = ARGB32
 
 
 	// Configure GE2D
