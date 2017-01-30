@@ -16,6 +16,8 @@
 #include "IonBuffer.h"
 #include "FrameBuffer.h"
 
+#define FBTFT_UPDATE             _IO('m', 313)
+
 
 struct option longopts[] = {
 	{ "aspect",			required_argument,  NULL,          'a' },
@@ -77,12 +79,12 @@ int main(int argc, char** argv)
 
 	// HDMI (ARGB32)
 	FrameBuffer fb0("/dev/fb0");
-	printf("fb0: screen info - width=%d, height=%d, bpp=%d\n", fb0.Width(), fb0.Height(), fb0.BitsPerPixel());
+	printf("fb0: screen info - width=%d, height=%d, bpp=%d addr=%p\n", fb0.Width(), fb0.Height(), fb0.BitsPerPixel(), fb0.PhysicalAddress());
 
 
 	// LCD (RGB565)
 	FrameBuffer fb2("/dev/fb2");
-	printf("fb2: screen info - width=%d, height=%d, bpp=%d\n", fb2.Width(), fb2.Height(), fb2.BitsPerPixel());
+	printf("fb2: screen info - width=%d, height=%d, bpp=%d addr=%p\n", fb2.Width(), fb2.Height(), fb2.BitsPerPixel(), fb2.PhysicalAddress());
 
 	if (fb2.BitsPerPixel() != 16)
 	{
@@ -116,7 +118,8 @@ int main(int argc, char** argv)
 			//fb2mem[offset] = 0xf800;	// Red
 			//fb2mem[offset] = 0x07e0;	// Green
 			//fb2mem[offset] = 0x001f;	// Blue
-			fb2mem[offset] = 0xffff;	// White
+			//fb2mem[offset] = 0xffff;	// White
+			fb2mem[offset] = 0x0000;	// Black
 		}
 	}
 
@@ -156,7 +159,7 @@ int main(int argc, char** argv)
 	configex.dst_para.top = 0;
 	configex.dst_para.width = fb2.Width();
 	configex.dst_para.height = fb2.Height();
-	configex.dst_planes[0].addr = lcdBuffer.PhysicalAddress();
+	configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
 	configex.dst_planes[0].w = fb2.Width();
 	configex.dst_planes[0].h = fb2.Height();
 
@@ -232,8 +235,12 @@ int main(int argc, char** argv)
 			throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
 		}
 
-		// Copy to LCD
-		memcpy(fb2mem, lcdBufferPtr, lcdBuffer.BufferSize());
+		// Update LCD
+		io = ioctl(fb2.FileDescriptor(), FBTFT_UPDATE);
+		if (io < 0)
+		{
+			throw Exception("FBTFT_UPDATE failed.");
+		}
 	}
 
 

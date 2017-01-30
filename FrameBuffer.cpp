@@ -49,6 +49,16 @@ FrameBuffer::FrameBuffer(const char* deviceName)
 	{
 		throw Exception("mmap failed");
 	}
+
+
+	struct fb_fix_screeninfo fixinfo;
+	io = ioctl(fd, FBIOGET_FSCREENINFO, &fixinfo);
+	if (io < 0)
+	{
+		throw Exception("FBIOGET_FSCREENINFO failed.");
+	}
+
+	physicalAddress = (void*)fixinfo.smem_start;
 }
 
 FrameBuffer::~FrameBuffer()

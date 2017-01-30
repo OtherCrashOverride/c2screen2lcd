@@ -11,7 +11,7 @@ class FrameBuffer
 	int bpp;
 	int length;
 	void* data;
-
+	void* physicalAddress;
 
 public:
 
@@ -48,6 +48,11 @@ public:
 	void* Data() const
 	{
 		return data;
+	}
+
+	void* PhysicalAddress() const
+	{
+		return physicalAddress;
 	}
 
 
