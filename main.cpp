@@ -8,12 +8,10 @@
 #include <string.h>
 #include <getopt.h>
 
-#include "ion.h"
-#include "meson_ion.h"
 #include "ge2d.h"
 #include "ge2d_cmd.h"
 
-#include "IonBuffer.h"
+#include "Exception.h"
 #include "FrameBuffer.h"
 
 #define FBTFT_UPDATE             _IO('m', 313)
@@ -98,11 +96,6 @@ int main(int argc, char** argv)
 	{
 		throw Exception("open /dev/ge2d failed.");
 	}
-
-
-	// Ion
-	IonBuffer lcdBuffer(fb2.Length());
-	void* lcdBufferPtr = lcdBuffer.Map();
 
 
 	// Clear the LCD display

@@ -10,5 +10,3 @@ echo 1 | sudo tee /sys/devices/platform/pwm-ctrl/enable0
 echo 1023 | sudo tee /sys/devices/platform/pwm-ctrl/duty0
 sudo chown root:video /dev/ge2d
 sudo chmod g+rw /dev/ge2d
-sudo chown root:video /dev/ion
-sudo chmod g+rw /dev/ion
