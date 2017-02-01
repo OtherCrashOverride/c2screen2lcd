@@ -21,13 +21,14 @@
 //const int DISPLAY_CANVAS_BASE_INDEX = 0x70; // 0x60;
 //#define PPMGR_CANVAS_INDEX 0x70
 
-#define AMEXT_MAGIC  'X'
-#define AMSTREAM_EXT_GET_CURRENT_VIDEOFRAME _IOR((AMEXT_MAGIC), 0x01, int)
-#define AMSTREAM_EXT_PUT_CURRENT_VIDEOFRAME _IO((AMEXT_MAGIC), 0x02)
+#define AMVIDEO_MAGIC  'X'
 
-#define AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_GE2D_FORMAT _IOR((AMEXT_MAGIC), 0x03, uint32_t)
-#define AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_SIZE _IOR((AMEXT_MAGIC), 0x04, uint64_t)
-#define AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_CANVAS0ADDR _IOR((AMEXT_MAGIC), 0x05, uint32_t)
+#define AMVIDEO_EXT_GET_CURRENT_VIDEOFRAME _IOR((AMVIDEO_MAGIC), 0x01, int32_t)
+#define AMVIDEO_EXT_PUT_CURRENT_VIDEOFRAME _IO((AMVIDEO_MAGIC), 0x02)
+
+#define AMVIDEO_EXT_CURRENT_VIDEOFRAME_GET_GE2D_FORMAT _IOR((AMVIDEO_MAGIC), 0x03, uint32_t)
+#define AMVIDEO_EXT_CURRENT_VIDEOFRAME_GET_SIZE _IOR((AMVIDEO_MAGIC), 0x04, uint64_t)
+#define AMVIDEO_EXT_CURRENT_VIDEOFRAME_GET_CANVAS0ADDR _IOR((AMVIDEO_MAGIC), 0x05, uint32_t)
 
 
 struct option longopts[] = {
@@ -305,10 +306,6 @@ int main(int argc, char** argv)
 	blitRect.dst_rect.w = dstWidth;
 	blitRect.dst_rect.h = dstHeight;
 
-
-	// Release any active frame, ignore error if there is none.
-	io = ioctl(amvideo_fd, AMSTREAM_EXT_PUT_CURRENT_VIDEOFRAME);
-
 	
 	bool skipFlag = false;
 
@@ -320,147 +317,150 @@ int main(int argc, char** argv)
 		}
 		else
 		{
+			if (!fb0.GetTransparencyEnabled())
+			{
 #if 1
-			// Video
-			int canvas_index;
-			io = ioctl(amvideo_fd, AMSTREAM_EXT_GET_CURRENT_VIDEOFRAME, &canvas_index);
-			if (io < 0)
-			{
-				//throw Exception("AMSTREAM_EXT_GET_CURRENT_VIDEOFRAME failed.");
-			}
-			else
-			{
-				//printf("amvideo: canvas_index=%x\n", canvas_index);
-
-
-				uint32_t canvas0addr;
-				io = ioctl(amvideo_fd, AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_CANVAS0ADDR, &canvas0addr);
+				// Video
+				int canvas_index;
+				io = ioctl(amvideo_fd, AMVIDEO_EXT_GET_CURRENT_VIDEOFRAME, &canvas_index);
 				if (io < 0)
 				{
-					throw Exception("AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_CANVAS0ADDR failed.");
+					//throw Exception("AMSTREAM_EXT_GET_CURRENT_VIDEOFRAME failed.");
 				}
-
-				//printf("amvideo: canvas0addr=%x\n", canvas0addr);
-
-
-				uint32_t ge2dformat;
-				io = ioctl(amvideo_fd, AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_GE2D_FORMAT, &ge2dformat);
-				if (io < 0)
+				else
 				{
-					throw Exception("AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_GE2D_FORMAT failed.");
+					//exit(1);
+
+					//printf("amvideo: canvas_index=%x\n", canvas_index);
+
+					uint32_t canvas0addr;
+					io = ioctl(amvideo_fd, AMVIDEO_EXT_CURRENT_VIDEOFRAME_GET_CANVAS0ADDR, &canvas0addr);
+					if (io < 0)
+					{
+						throw Exception("AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_CANVAS0ADDR failed.");
+					}
+
+					//printf("amvideo: canvas0addr=%x\n", canvas0addr);
+
+
+					uint32_t ge2dformat;
+					io = ioctl(amvideo_fd, AMVIDEO_EXT_CURRENT_VIDEOFRAME_GET_GE2D_FORMAT, &ge2dformat);
+					if (io < 0)
+					{
+						throw Exception("AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_GE2D_FORMAT failed.");
+					}
+
+					//printf("amvideo: ge2dformat=%x\n", ge2dformat);
+
+
+					uint64_t size;
+					io = ioctl(amvideo_fd, AMVIDEO_EXT_CURRENT_VIDEOFRAME_GET_SIZE, &size);
+					if (io < 0)
+					{
+						throw Exception("AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_SIZE failed.");
+					}
+
+					int videoWidth = size >> 32;
+					int videoHeight = size & 0xffffff;
+					//printf("amvideo: size=%x (%dx%d)\n", size, size >> 32, size & 0xffffff);
+
+
+					//configex.src_para.mem_type = CANVAS_OSD0;
+					//configex.src_para.canvas_index = 0;
+					//configex.src_para.left = 0;
+					//configex.src_para.top = 0;
+					//configex.src_para.width = fb0.Width();
+					//configex.src_para.height = fb0.Height();
+
+					//switch (fb0.BitsPerPixel())
+					//{
+					//	case 16:
+					//		configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
+					//		break;
+
+					//	case 24:
+					//		configex.src_para.format = GE2D_FORMAT_S24_RGB;
+					//		break;
+
+					//	case 32:
+					//		configex.src_para.format = GE2D_FORMAT_S32_ARGB;
+					//		break;
+
+					//	default:
+					//		throw Exception("fb0 bits per pixel not supported");
+					//}
+
+
+					configex.src_para.mem_type = CANVAS_TYPE_INVALID;
+					configex.src_para.canvas_index = canvas0addr; //((canvas_index << 8) | canvas0addr);
+					configex.src_para.left = 0;
+					configex.src_para.top = 0;
+					configex.src_para.width = videoWidth;
+					configex.src_para.height = videoHeight / 2;
+					configex.src_para.format = ge2dformat;
+
+					configex.dst_para.mem_type = CANVAS_ALLOC;
+					configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+					configex.dst_para.left = 0;
+					configex.dst_para.top = 0;
+					configex.dst_para.width = fb2.Width();
+					configex.dst_para.height = fb2.Height();
+					configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
+					configex.dst_planes[0].w = fb2.Width();
+					configex.dst_planes[0].h = fb2.Height();
+
+
+					io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
+					if (io < 0)
+					{
+						throw Exception("video GE2D_CONFIG_EX failed.\n");
+					}
+
+
+					//blitRect.src1_rect.x = 0;
+					//blitRect.src1_rect.y = 0;
+					//blitRect.src1_rect.w = configex.src_para.width;
+					//blitRect.src1_rect.h = configex.src_para.height;
+
+
+					blitRect.src1_rect.x = 0;
+					blitRect.src1_rect.y = 0;
+					blitRect.src1_rect.w = configex.src_para.width;
+					blitRect.src1_rect.h = configex.src_para.height;
+
+
+					//CorrectAspect((float)videoWidth / (float)videoHeight, &dstX, &dstY, &dstWidth, &dstHeight);
+					CorrectAspect(aspect, &dstX, &dstY, &dstWidth, &dstHeight);
+
+					blitRect.dst_rect.x = dstX;
+					blitRect.dst_rect.y = dstY;
+					blitRect.dst_rect.w = dstWidth;
+					blitRect.dst_rect.h = dstHeight;
+
+
+					//blitRect.op = (OPERATION_ADD << 24) |
+					//	(COLOR_FACTOR_SRC_ALPHA << 20) |
+					//	(COLOR_FACTOR_ONE_MINUS_SRC_ALPHA << 16) |
+					//	(OPERATION_ADD << 8) |
+					//	(COLOR_FACTOR_ONE << 4) |
+					//	(COLOR_FACTOR_ZERO << 0);
+
+					// Color conversion
+					io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect); //GE2D_STRETCHBLIT_NOALPHA
+					if (io < 0)
+					{
+						throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
+					}
+
+
+					io = ioctl(amvideo_fd, AMVIDEO_EXT_PUT_CURRENT_VIDEOFRAME);
+					if (io < 0)
+					{
+						throw Exception("AMSTREAM_EXT_PUT_CURRENT_VIDEOFRAME failed.");
+					}
 				}
-
-				//printf("amvideo: ge2dformat=%x\n", ge2dformat);
-
-
-				uint64_t size;
-				io = ioctl(amvideo_fd, AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_SIZE, &size);
-				if (io < 0)
-				{
-					throw Exception("AMSTREAM_EXT_CURRENT_VIDEOFRAME_GET_SIZE failed.");
-				}
-
-				int videoWidth = size >> 32;
-				int videoHeight = size & 0xffffff;
-				//printf("amvideo: size=%x (%dx%d)\n", size, size >> 32, size & 0xffffff);
-
-
-				//configex.src_para.mem_type = CANVAS_OSD0;
-				//configex.src_para.canvas_index = 0;
-				//configex.src_para.left = 0;
-				//configex.src_para.top = 0;
-				//configex.src_para.width = fb0.Width();
-				//configex.src_para.height = fb0.Height();
-
-				//switch (fb0.BitsPerPixel())
-				//{
-				//	case 16:
-				//		configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
-				//		break;
-
-				//	case 24:
-				//		configex.src_para.format = GE2D_FORMAT_S24_RGB;
-				//		break;
-
-				//	case 32:
-				//		configex.src_para.format = GE2D_FORMAT_S32_ARGB;
-				//		break;
-
-				//	default:
-				//		throw Exception("fb0 bits per pixel not supported");
-				//}
-
-
-				configex.src_para.mem_type = CANVAS_TYPE_INVALID;
-				configex.src_para.canvas_index = canvas0addr; //((canvas_index << 8) | canvas0addr);
-				configex.src_para.left = 0;
-				configex.src_para.top = 0;
-				configex.src_para.width = videoWidth;
-				configex.src_para.height = videoHeight / 2;
-				configex.src_para.format = ge2dformat;
-
-				configex.dst_para.mem_type = CANVAS_ALLOC;
-				configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
-				configex.dst_para.left = 0;
-				configex.dst_para.top = 0;
-				configex.dst_para.width = fb2.Width();
-				configex.dst_para.height = fb2.Height();
-				configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
-				configex.dst_planes[0].w = fb2.Width();
-				configex.dst_planes[0].h = fb2.Height();
-
-
-				io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
-				if (io < 0)
-				{
-					throw Exception("video GE2D_CONFIG_EX failed.\n");
-				}
-
-
-				//blitRect.src1_rect.x = 0;
-				//blitRect.src1_rect.y = 0;
-				//blitRect.src1_rect.w = configex.src_para.width;
-				//blitRect.src1_rect.h = configex.src_para.height;
-
-
-				blitRect.src1_rect.x = 0;
-				blitRect.src1_rect.y = 0;
-				blitRect.src1_rect.w = configex.src_para.width;
-				blitRect.src1_rect.h = configex.src_para.height;
-
-
-				//CorrectAspect((float)videoWidth / (float)videoHeight, &dstX, &dstY, &dstWidth, &dstHeight);
-				CorrectAspect(aspect, &dstX, &dstY, &dstWidth, &dstHeight);
-
-				blitRect.dst_rect.x = dstX;
-				blitRect.dst_rect.y = dstY;
-				blitRect.dst_rect.w = dstWidth;
-				blitRect.dst_rect.h = dstHeight;
-
-
-				//blitRect.op = (OPERATION_ADD << 24) |
-				//	(COLOR_FACTOR_SRC_ALPHA << 20) |
-				//	(COLOR_FACTOR_ONE_MINUS_SRC_ALPHA << 16) |
-				//	(OPERATION_ADD << 8) |
-				//	(COLOR_FACTOR_ONE << 4) |
-				//	(COLOR_FACTOR_ZERO << 0);
-
-				// Color conversion
-				io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect); //GE2D_STRETCHBLIT_NOALPHA
-				if (io < 0)
-				{
-					throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
-				}
-
-
-				io = ioctl(amvideo_fd, AMSTREAM_EXT_PUT_CURRENT_VIDEOFRAME);
-				if (io < 0)
-				{
-					throw Exception("AMSTREAM_EXT_PUT_CURRENT_VIDEOFRAME failed.");
-				}
-			}
 #endif
-
+			}
 
 
 #if 1
@@ -560,7 +560,15 @@ int main(int argc, char** argv)
 			fb0.WaitForVSync();
 
 
-			io = ioctl(ge2d_fd, GE2D_BLEND, &blitRect);
+			if (fb0.GetTransparencyEnabled())
+			{
+				io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
+			}
+			else
+			{
+				io = ioctl(ge2d_fd, GE2D_BLEND, &blitRect);
+			}
+
 			if (io < 0)
 			{
 				throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");

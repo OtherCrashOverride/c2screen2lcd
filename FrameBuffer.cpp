@@ -82,3 +82,16 @@ void FrameBuffer::WaitForVSync()
 	}
 
 }
+
+bool FrameBuffer::GetTransparencyEnabled()
+{
+	struct fb_var_screeninfo info;
+
+	int io = ioctl(fd, FBIOGET_VSCREENINFO, &info);
+	if (io < 0)
+	{
+		throw Exception("FBIOGET_VSCREENINFO failed.");
+	}
+
+	return info.transp.length == 0;
+}

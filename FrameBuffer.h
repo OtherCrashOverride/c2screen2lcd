@@ -61,4 +61,5 @@ public:
 
 
 	void WaitForVSync();
+	bool GetTransparencyEnabled();
 };
