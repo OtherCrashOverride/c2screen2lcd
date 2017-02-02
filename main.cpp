@@ -45,6 +45,60 @@ void ShowUsage()
 	printf("  -a, --aspect h:w\tForce aspect ratio\n");
 }
 
+struct Rectangle
+{
+	int X;
+	int Y;
+	int Width;
+	int Height;
+};
+
+struct Size
+{
+	int Width;
+	int Height;
+
+	Size(int width, int height)
+		: Width(width), Height(height)
+	{
+	}
+};
+
+void CalculateRectangle(Size targetSize, float targetAspect, float sourceAspect,  Rectangle* outRectangle)
+{
+	// Aspect ratio
+	int dstX;
+	int dstY;
+	int dstWidth;
+	int dstHeight;
+
+	if (targetAspect == sourceAspect)
+	{
+		dstWidth = targetSize.Width;
+		dstHeight = targetSize.Height;
+		dstX = 0;
+		dstY = 0;
+	}
+	else if (targetAspect > sourceAspect)
+	{
+		dstWidth = targetSize.Height * sourceAspect;
+		dstHeight = targetSize.Height;
+		dstX = (targetSize.Width / 2) - (dstWidth / 2);
+		dstY = 0;
+	}
+	else
+	{
+		dstWidth = targetSize.Width;
+		dstHeight = targetSize.Width * (1.0f / sourceAspect);
+		dstX = 0;
+		dstY = (targetSize.Height / 2) - (dstHeight / 2);
+	}
+
+	(*outRectangle).X = dstX;
+	(*outRectangle).Y = dstY;
+	(*outRectangle).Width = dstWidth;
+	(*outRectangle).Height = dstHeight;
+}
 
 void CorrectAspect(float aspect, int* x, int* y, int* width, int* height)
 {
@@ -161,97 +215,8 @@ int main(int argc, char** argv)
 	}
 
 	
-	// Ion
-	IonBuffer videoBuffer(fb2.Length());
-	
-	void* videoBufferPtr = videoBuffer.Map();
-	memset(videoBufferPtr, 0, videoBuffer.BufferSize());
-
-
 	// Clear the LCD display
-	uint16_t* fb2mem = (uint16_t*)fb2.Data();
-
-	for (int y = 0; y < fb2.Height(); ++y)
-	{
-		for (int x = 0; x < fb2.Width(); ++x)
-		{
-			size_t offset = y * fb2.Width() + x;
-
-			// 16 bit color
-			//fb2mem[offset] = 0xf800;	// Red
-			//fb2mem[offset] = 0x07e0;	// Green
-			//fb2mem[offset] = 0x001f;	// Blue
-			//fb2mem[offset] = 0xffff;	// White
-			fb2mem[offset] = 0x0000;	// Black
-		}
-	}
-
-
-	// Configure GE2D
-	struct config_para_ex_s configex = { 0 };
-
-	switch (fb0.BitsPerPixel())
-	{
-		case 16:
-			configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
-			break;
-
-		case 24:
-			configex.src_para.format = GE2D_FORMAT_S24_RGB;
-			break;
-
-		case 32:
-			configex.src_para.format = GE2D_FORMAT_S32_ARGB;
-			break;
-
-		default:
-			throw Exception("fb0 bits per pixel not supported");
-	}
-
-	//configex.src_para.mem_type = CANVAS_OSD0;
-	//configex.src_para.left = 0;
-	//configex.src_para.top = 0;
-	//configex.src_para.width = fb0.Width();
-	//configex.src_para.height = fb0.Height();
-
-	int src_index = 0x8180; //0x01c3; // ((0xc3 & 0xff) | (((0x00) << 8) & 0x0000ff00));
-	configex.src_para.mem_type = CANVAS_TYPE_INVALID; //CANVAS_ALLOC;
-	configex.src_para.format = GE2D_FORMAT_S8_Y; // GE2D_FORMAT_S8_Y; //GE2D_FORMAT_M24_NV21;
-	configex.src_para.canvas_index = src_index;
-	//configex.src_para.left = 0;
-	//configex.src_para.top = 0;
-	//configex.src_para.width = 1920;
-	//configex.src_para.height = 1088;
-	//0x77ce5000-0x64800000-0x64800000
-	//3840-800-800
-	//544-608-608
-	//configex.src_planes[0].addr = (long unsigned int)0x770f1000;
-	//configex.src_planes[0].w = 3840;
-	//configex.src_planes[0].h = 544;
-	//configex.src_planes[1].addr = (long unsigned int)0x64800000;
-	//configex.src_planes[1].w = 800;
-	//configex.src_planes[1].h = 608;
-	/*configex.src_planes[3].addr = (long unsigned int)0x64800000;
-	configex.src_planes[3].w = 800;
-	configex.src_planes[3].h = 608;*/
-
-	configex.src2_para.mem_type = CANVAS_TYPE_INVALID;
-
-	configex.dst_para.mem_type = CANVAS_ALLOC;
-	configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
-	configex.dst_para.left = 0;
-	configex.dst_para.top = 0;
-	configex.dst_para.width = fb2.Width();
-	configex.dst_para.height = fb2.Height();
-	configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
-	configex.dst_planes[0].w = fb2.Width();
-	configex.dst_planes[0].h = fb2.Height();
-
-	io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
-	if (io < 0)
-	{
-		throw Exception("GE2D_CONFIG_EX failed.\n");
-	}
+	memset(fb2.Data(), 0, fb2.Length());
 
 
 	// Aspect ratio
@@ -263,50 +228,23 @@ int main(int argc, char** argv)
 		aspect = (float)fb0.Width() / (float)fb0.Height();
 	}
 
-	int dstX;
-	int dstY;
-	int dstWidth;
-	int dstHeight;
-
-	if (aspect == LCD_ASPECT)
-	{
-		dstWidth = fb2.Width();
-		dstHeight = fb2.Height();
-		dstX = 0;
-		dstY = 0;
-	}
-	else if (aspect < LCD_ASPECT)
-	{
-		dstWidth = fb2.Height() * aspect;
-		dstHeight = fb2.Height();
-		dstX = (fb2.Width() / 2) - (dstWidth / 2);
-		dstY = 0;
-	}
-	else
-	{
-		dstWidth = fb2.Width();
-		dstHeight = fb2.Width() * (1.0f / aspect);
-		dstX = 0;
-		dstY = (fb2.Height() / 2) - (dstHeight / 2);
-	}
-
 	printf("aspect=%f\n", aspect);
 
 
-	//  Blit rectangle
+	Rectangle frameBufferRect;
+	CalculateRectangle(Size(480, 320), LCD_ASPECT, aspect, &frameBufferRect);
+
+
+	// Ion
+	IonBuffer videoBuffer(fb2.Width() * fb2.Height() * 2); // RGB565
+
+	void* videoBufferPtr = videoBuffer.Map();
+	memset(videoBufferPtr, 0, videoBuffer.BufferSize());
+
+
+
+	struct config_para_ex_s configex = { 0 };
 	ge2d_para_s blitRect = { 0 };
-
-	blitRect.src1_rect.x = 0;
-	blitRect.src1_rect.y = 0;
-	blitRect.src1_rect.w = configex.src_para.width;
-	blitRect.src1_rect.h = configex.src_para.height;
-
-	blitRect.dst_rect.x = dstX;
-	blitRect.dst_rect.y = dstY;
-	blitRect.dst_rect.w = dstWidth;
-	blitRect.dst_rect.h = dstHeight;
-
-	
 	bool skipFlag = false;
 
 	while (true)
@@ -317,6 +255,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
+
 			if (!fb0.GetTransparencyEnabled())
 			{
 #if 1
@@ -364,51 +303,34 @@ int main(int argc, char** argv)
 					int videoHeight = size & 0xffffff;
 					//printf("amvideo: size=%x (%dx%d)\n", size, size >> 32, size & 0xffffff);
 
-
-					//configex.src_para.mem_type = CANVAS_OSD0;
-					//configex.src_para.canvas_index = 0;
-					//configex.src_para.left = 0;
-					//configex.src_para.top = 0;
-					//configex.src_para.width = fb0.Width();
-					//configex.src_para.height = fb0.Height();
-
-					//switch (fb0.BitsPerPixel())
-					//{
-					//	case 16:
-					//		configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
-					//		break;
-
-					//	case 24:
-					//		configex.src_para.format = GE2D_FORMAT_S24_RGB;
-					//		break;
-
-					//	case 32:
-					//		configex.src_para.format = GE2D_FORMAT_S32_ARGB;
-					//		break;
-
-					//	default:
-					//		throw Exception("fb0 bits per pixel not supported");
-					//}
+					Rectangle videoRect;
+					float videoAspect = (float)videoWidth / (float)videoHeight;
+					//CalculateRectangle(Size(fb2.Width(), fb2.Height()), aspect, videoAspect, &videoRect);
 
 
-					configex.src_para.mem_type = CANVAS_TYPE_INVALID;
-					configex.src_para.canvas_index = canvas0addr; //((canvas_index << 8) | canvas0addr);
-					configex.src_para.left = 0;
-					configex.src_para.top = 0;
-					configex.src_para.width = videoWidth;
-					configex.src_para.height = videoHeight / 2;
-					configex.src_para.format = ge2dformat;
+					// convert to display aspect
+					Rectangle dstRect;
+					CalculateRectangle(Size(fb2.Width(), fb2.Height()), LCD_ASPECT, aspect, &dstRect);
+
+					// convert to LCD aspect
+					CalculateRectangle(Size(dstRect.Width, dstRect.Height), aspect, videoAspect, &videoRect);
+					
+
+
+					// ---
+					// Clear
+					configex = { 0 };
 
 					configex.dst_para.mem_type = CANVAS_ALLOC;
 					configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
 					configex.dst_para.left = 0;
 					configex.dst_para.top = 0;
+
 					configex.dst_para.width = fb2.Width();
 					configex.dst_para.height = fb2.Height();
-					configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
-					configex.dst_planes[0].w = fb2.Width();
-					configex.dst_planes[0].h = fb2.Height();
-
+					configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
+					configex.dst_planes[0].w = configex.dst_para.width;
+					configex.dst_planes[0].h = configex.dst_para.height;
 
 					io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
 					if (io < 0)
@@ -417,10 +339,56 @@ int main(int argc, char** argv)
 					}
 
 
-					//blitRect.src1_rect.x = 0;
-					//blitRect.src1_rect.y = 0;
-					//blitRect.src1_rect.w = configex.src_para.width;
-					//blitRect.src1_rect.h = configex.src_para.height;
+					blitRect.dst_rect.x =0;
+					blitRect.dst_rect.y = 0;
+					blitRect.dst_rect.w = fb2.Width();
+					blitRect.dst_rect.h = fb2.Height();
+					blitRect.color = 0x000000ff;	// RGBA
+
+					io = ioctl(ge2d_fd, GE2D_FILLRECTANGLE, &blitRect);
+					if (io < 0)
+					{
+						throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
+					}
+
+					// ---
+
+					configex.src_para.mem_type = CANVAS_TYPE_INVALID;
+					configex.src_para.canvas_index = canvas0addr;
+					configex.src_para.left = 0;
+					configex.src_para.top = 0;
+					configex.src_para.width = videoWidth;
+					configex.src_para.height = videoHeight / 2;
+					configex.src_para.format = ge2dformat;
+					
+
+					configex.dst_para.mem_type = CANVAS_ALLOC;
+					configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+					configex.dst_para.left = 0;
+					configex.dst_para.top = 0;
+#if 0
+					configex.dst_para.width = fb2.Width();
+					configex.dst_para.height = fb2.Height();
+					configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
+					configex.dst_planes[0].w = configex.dst_para.width;
+					configex.dst_planes[0].h = configex.dst_para.height;
+#else
+					configex.dst_para.width = fb2.Width();
+					configex.dst_para.height = fb2.Height();
+					configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
+					configex.dst_planes[0].w = configex.dst_para.width;
+					configex.dst_planes[0].h = configex.dst_para.height;
+#endif
+					io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
+					if (io < 0)
+					{
+						throw Exception("video GE2D_CONFIG_EX failed.\n");
+					}
+
+
+					//CorrectAspect((float)videoWidth / (float)videoHeight, &dstX, &dstY, &dstWidth, &dstHeight);
+					//CorrectAspect(aspect, &dstX, &dstY, &dstWidth, &dstHeight);
+					
 
 
 					blitRect.src1_rect.x = 0;
@@ -428,31 +396,25 @@ int main(int argc, char** argv)
 					blitRect.src1_rect.w = configex.src_para.width;
 					blitRect.src1_rect.h = configex.src_para.height;
 
+					blitRect.dst_rect.x = dstRect.X + videoRect.X;
+					blitRect.dst_rect.y = dstRect.Y + videoRect.Y;
+					blitRect.dst_rect.w = videoRect.Width;
+					blitRect.dst_rect.h = videoRect.Height;
 
-					//CorrectAspect((float)videoWidth / (float)videoHeight, &dstX, &dstY, &dstWidth, &dstHeight);
-					CorrectAspect(aspect, &dstX, &dstY, &dstWidth, &dstHeight);
-
-					blitRect.dst_rect.x = dstX;
-					blitRect.dst_rect.y = dstY;
-					blitRect.dst_rect.w = dstWidth;
-					blitRect.dst_rect.h = dstHeight;
+					printf("rect=%d,%d %dx%d\n", videoRect.X, videoRect.Y, videoRect.Width, videoRect.Height);
 
 
-					//blitRect.op = (OPERATION_ADD << 24) |
-					//	(COLOR_FACTOR_SRC_ALPHA << 20) |
-					//	(COLOR_FACTOR_ONE_MINUS_SRC_ALPHA << 16) |
-					//	(OPERATION_ADD << 8) |
-					//	(COLOR_FACTOR_ONE << 4) |
-					//	(COLOR_FACTOR_ZERO << 0);
 
-					// Color conversion
-					io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect); //GE2D_STRETCHBLIT_NOALPHA
+
+					// Blit
+					io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
 					if (io < 0)
 					{
 						throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
 					}
 
 
+					// Return video frame
 					io = ioctl(amvideo_fd, AMVIDEO_EXT_PUT_CURRENT_VIDEOFRAME);
 					if (io < 0)
 					{
@@ -490,29 +452,26 @@ int main(int argc, char** argv)
 			configex.src_para.top = 0;
 			configex.src_para.width = fb0.Width();
 			configex.src_para.height = fb0.Height();
-			configex.src_para.y_rev = 0;
 
-			configex.src2_para.mem_type = CANVAS_ALLOC;
 			configex.src2_para.format = GE2D_FORMAT_S16_RGB_565;
+			configex.src2_para.mem_type = CANVAS_ALLOC;
 			configex.src2_para.left = 0;
 			configex.src2_para.top = 0;
 			configex.src2_para.width = fb2.Width();
 			configex.src2_para.height = fb2.Height();
-			configex.src2_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
-			configex.src2_planes[0].w = fb2.Width();
-			configex.src2_planes[0].h = fb2.Height();
-			configex.src2_para.y_rev = 0;
+			configex.src2_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();; //videoBuffer.PhysicalAddress();
+			configex.src2_planes[0].w = configex.src2_para.width;
+			configex.src2_planes[0].h = configex.src2_para.height;
 
-			configex.dst_para.mem_type = CANVAS_ALLOC;
 			configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+			configex.dst_para.mem_type = CANVAS_ALLOC;
 			configex.dst_para.left = 0;
 			configex.dst_para.top = 0;
 			configex.dst_para.width = fb2.Width();
 			configex.dst_para.height = fb2.Height();
 			configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
-			configex.dst_planes[0].w = fb2.Width();
-			configex.dst_planes[0].h = fb2.Height();
-
+			configex.dst_planes[0].w = configex.dst_para.width;
+			configex.dst_planes[0].h = configex.dst_para.height;
 
 			io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
 			if (io < 0)
@@ -531,14 +490,12 @@ int main(int argc, char** argv)
 			blitRect.src2_rect.w = configex.src2_para.width;
 			blitRect.src2_rect.h = configex.src2_para.height;
 
+			blitRect.dst_rect.x = 0; //frameBufferRect.X;
+			blitRect.dst_rect.y = 0; //frameBufferRect.Y;
+			blitRect.dst_rect.w = fb2.Width(); //frameBufferRect.Width;
+			blitRect.dst_rect.h = fb2.Height(); //frameBufferRect.Height;
 
-			CorrectAspect(aspect, &dstX, &dstY, &dstWidth, &dstHeight);
-
-			blitRect.dst_rect.x = dstX;
-			blitRect.dst_rect.y = dstY;
-			blitRect.dst_rect.w = dstWidth;
-			blitRect.dst_rect.h = dstHeight;
-
+			//printf("rect=%d,%d %dx%d\n", frameBufferRect.X, frameBufferRect.Y, frameBufferRect.Width, frameBufferRect.Height);
 
 			/*
 			ge2d_cmd_cfg->color_blend_mode = (op >> 24) & 0xff;
