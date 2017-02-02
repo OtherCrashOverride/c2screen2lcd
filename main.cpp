@@ -246,10 +246,13 @@ int main(int argc, char** argv)
 	struct config_para_ex_s configex = { 0 };
 	ge2d_para_s blitRect = { 0 };
 	bool skipFlag = false;
+	int frameCount = 0;
 
 	while (true)
 	{
-		if (skipFlag)
+		++frameCount;
+
+		if (frameCount % 5 != 0)
 		{
 			fb0.WaitForVSync();
 		}
@@ -328,7 +331,7 @@ int main(int argc, char** argv)
 
 					configex.dst_para.width = fb2.Width();
 					configex.dst_para.height = fb2.Height();
-					configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
+					configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
 					configex.dst_planes[0].w = configex.dst_para.width;
 					configex.dst_planes[0].h = configex.dst_para.height;
 
@@ -366,7 +369,7 @@ int main(int argc, char** argv)
 					configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
 					configex.dst_para.left = 0;
 					configex.dst_para.top = 0;
-#if 0
+#if 1
 					configex.dst_para.width = fb2.Width();
 					configex.dst_para.height = fb2.Height();
 					configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
@@ -401,12 +404,12 @@ int main(int argc, char** argv)
 					blitRect.dst_rect.w = videoRect.Width;
 					blitRect.dst_rect.h = videoRect.Height;
 
-					printf("rect=%d,%d %dx%d\n", videoRect.X, videoRect.Y, videoRect.Width, videoRect.Height);
+					//printf("rect=%d,%d %dx%d\n", videoRect.X, videoRect.Y, videoRect.Width, videoRect.Height);
 
 
 
 
-					// Blit
+					// Blit to videoBuffer
 					io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
 					if (io < 0)
 					{
@@ -419,6 +422,52 @@ int main(int argc, char** argv)
 					if (io < 0)
 					{
 						throw Exception("AMSTREAM_EXT_PUT_CURRENT_VIDEOFRAME failed.");
+					}
+
+					
+					// Blit to LCD
+					configex.src_para.mem_type = CANVAS_ALLOC;
+					configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
+					configex.src_para.canvas_index = 0;
+					configex.src_para.left = 0;
+					configex.src_para.top = 0;
+					configex.src_para.width = fb2.Width();
+					configex.src_para.height = fb2.Height();
+					configex.src_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
+					configex.src_planes[0].w = configex.src_para.width;
+					configex.src_planes[0].h = configex.src_para.height;
+
+					configex.dst_para.mem_type = CANVAS_ALLOC;
+					configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+					configex.dst_para.left = 0;
+					configex.dst_para.top = 0;
+					configex.dst_para.width = fb2.Width();
+					configex.dst_para.height = fb2.Height();
+					configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
+					configex.dst_planes[0].w = configex.dst_para.width;
+					configex.dst_planes[0].h = configex.dst_para.height;
+
+					io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
+					if (io < 0)
+					{
+						throw Exception("video GE2D_CONFIG_EX failed.\n");
+					}
+
+
+					blitRect.src1_rect.x = 0;
+					blitRect.src1_rect.y = 0;
+					blitRect.src1_rect.w = configex.src_para.width;
+					blitRect.src1_rect.h = configex.src_para.height;
+
+					blitRect.dst_rect.x = 0;
+					blitRect.dst_rect.y = 0;
+					blitRect.dst_rect.w = configex.dst_para.width;
+					blitRect.dst_rect.h = configex.dst_para.height;
+
+					io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
+					if (io < 0)
+					{
+						throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
 					}
 				}
 #endif
@@ -485,15 +534,15 @@ int main(int argc, char** argv)
 			blitRect.src1_rect.w = configex.src_para.width;
 			blitRect.src1_rect.h = configex.src_para.height;
 
-			blitRect.src2_rect.x = 0;
-			blitRect.src2_rect.y = 0;
-			blitRect.src2_rect.w = configex.src2_para.width;
-			blitRect.src2_rect.h = configex.src2_para.height;
+			blitRect.src2_rect.x = frameBufferRect.X;	//0;
+			blitRect.src2_rect.y = frameBufferRect.Y;	//0;
+			blitRect.src2_rect.w = frameBufferRect.Width; //configex.src2_para.width;
+			blitRect.src2_rect.h = frameBufferRect.Height;  //configex.src2_para.height;
 
-			blitRect.dst_rect.x = 0; //frameBufferRect.X;
-			blitRect.dst_rect.y = 0; //frameBufferRect.Y;
-			blitRect.dst_rect.w = fb2.Width(); //frameBufferRect.Width;
-			blitRect.dst_rect.h = fb2.Height(); //frameBufferRect.Height;
+			blitRect.dst_rect.x = frameBufferRect.X;	// 0;
+			blitRect.dst_rect.y = frameBufferRect.Y;	//0;
+			blitRect.dst_rect.w = frameBufferRect.Width;	//fb2.Width();
+			blitRect.dst_rect.h = frameBufferRect.Height; //fb2.Height();
 
 			//printf("rect=%d,%d %dx%d\n", frameBufferRect.X, frameBufferRect.Y, frameBufferRect.Width, frameBufferRect.Height);
 
