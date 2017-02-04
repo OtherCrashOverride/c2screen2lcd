@@ -66,32 +66,37 @@ struct Size
 
 void CalculateRectangle(Size targetSize, float targetAspect, float sourceAspect,  Rectangle* outRectangle)
 {
+	//printf("CalculateRectangle: targetSize=%d,%d targetAspect=%f sourceAspect=%f\n", targetSize.Width, targetSize.Height, targetAspect, sourceAspect);
+
 	// Aspect ratio
 	int dstX;
 	int dstY;
 	int dstWidth;
 	int dstHeight;
 
-	if (targetAspect == sourceAspect)
+/*	if (targetAspect == sourceAspect)
 	{
 		dstWidth = targetSize.Width;
 		dstHeight = targetSize.Height;
 		dstX = 0;
 		dstY = 0;
 	}
-	else if (targetAspect > sourceAspect)
-	{
-		dstWidth = targetSize.Height * sourceAspect;
-		dstHeight = targetSize.Height;
-		dstX = (targetSize.Width / 2) - (dstWidth / 2);
-		dstY = 0;
-	}
-	else
+	else*/ 
+	if (sourceAspect >= targetAspect)
 	{
 		dstWidth = targetSize.Width;
 		dstHeight = targetSize.Width * (1.0f / sourceAspect);
 		dstX = 0;
-		dstY = (targetSize.Height / 2) - (dstHeight / 2);
+		dstY = (targetSize.Height / 2.0f) - (dstHeight / 2.0f);
+
+		//printf("CalculateRectangle: %d, %d - %d x %d\n", dstX, dstY, dstWidth, dstHeight);
+	}
+	else
+	{
+		dstWidth = targetSize.Height * sourceAspect;
+		dstHeight = targetSize.Height;
+		dstX = (targetSize.Width / 2.0f) - (dstWidth / 2.0f);
+		dstY = 0;
 	}
 
 	(*outRectangle).X = dstX;
@@ -236,7 +241,7 @@ int main(int argc, char** argv)
 
 
 	// Ion
-	IonBuffer videoBuffer(fb2.Width() * fb2.Height() * 2); // RGB565
+	IonBuffer videoBuffer(fb0.Width() * fb0.Height() * 2); // RGB565
 
 	void* videoBufferPtr = videoBuffer.Map();
 	memset(videoBufferPtr, 0, videoBuffer.BufferSize());
@@ -258,6 +263,7 @@ int main(int argc, char** argv)
 		}
 		else
 		{
+			//printf("frameBufferRect=%d,%d %dx%d\n", frameBufferRect.X, frameBufferRect.Y, frameBufferRect.Width, frameBufferRect.Height);
 
 			if (!fb0.GetTransparencyEnabled())
 			{
@@ -311,18 +317,24 @@ int main(int argc, char** argv)
 					//CalculateRectangle(Size(fb2.Width(), fb2.Height()), aspect, videoAspect, &videoRect);
 
 
-					// convert to display aspect
-					Rectangle dstRect;
-					CalculateRectangle(Size(fb2.Width(), fb2.Height()), LCD_ASPECT, aspect, &dstRect);
+					//Rectangle dstRect;
 
-					// convert to LCD aspect
-					CalculateRectangle(Size(dstRect.Width, dstRect.Height), aspect, videoAspect, &videoRect);
 					
+					// convert to display aspect
+					CalculateRectangle(Size(fb0.Width(), fb0.Height()), aspect, videoAspect, &videoRect);
+					//printf("videoRect=%d,%d %dx%d\n", videoRect.X, videoRect.Y, videoRect.Width, videoRect.Height);
 
+
+					//// convert to LCD aspect
+					//CalculateRectangle(Size(fb2.Width(), fb2.Height()), LCD_ASPECT, aspect, &dstRect);
+					//videoRect = dstRect;
 
 					// ---
-					// Clear
 					configex = { 0 };
+
+#if 0
+					// Clear
+					
 
 					configex.dst_para.mem_type = CANVAS_ALLOC;
 					configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
@@ -353,6 +365,7 @@ int main(int argc, char** argv)
 					{
 						throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
 					}
+#endif
 
 					// ---
 
@@ -370,8 +383,8 @@ int main(int argc, char** argv)
 					configex.dst_para.left = 0;
 					configex.dst_para.top = 0;
 #if 1
-					configex.dst_para.width = fb2.Width();
-					configex.dst_para.height = fb2.Height();
+					configex.dst_para.width = fb0.Width();
+					configex.dst_para.height = fb0.Height();
 					configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
 					configex.dst_planes[0].w = configex.dst_para.width;
 					configex.dst_planes[0].h = configex.dst_para.height;
@@ -399,8 +412,8 @@ int main(int argc, char** argv)
 					blitRect.src1_rect.w = configex.src_para.width;
 					blitRect.src1_rect.h = configex.src_para.height;
 
-					blitRect.dst_rect.x = dstRect.X + videoRect.X;
-					blitRect.dst_rect.y = dstRect.Y + videoRect.Y;
+					blitRect.dst_rect.x = videoRect.X;
+					blitRect.dst_rect.y = videoRect.Y;
 					blitRect.dst_rect.w = videoRect.Width;
 					blitRect.dst_rect.h = videoRect.Height;
 
@@ -431,8 +444,8 @@ int main(int argc, char** argv)
 					configex.src_para.canvas_index = 0;
 					configex.src_para.left = 0;
 					configex.src_para.top = 0;
-					configex.src_para.width = fb2.Width();
-					configex.src_para.height = fb2.Height();
+					configex.src_para.width = fb0.Width();
+					configex.src_para.height = fb0.Height();
 					configex.src_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
 					configex.src_planes[0].w = configex.src_para.width;
 					configex.src_planes[0].h = configex.src_para.height;
@@ -459,10 +472,10 @@ int main(int argc, char** argv)
 					blitRect.src1_rect.w = configex.src_para.width;
 					blitRect.src1_rect.h = configex.src_para.height;
 
-					blitRect.dst_rect.x = 0;
-					blitRect.dst_rect.y = 0;
-					blitRect.dst_rect.w = configex.dst_para.width;
-					blitRect.dst_rect.h = configex.dst_para.height;
+					blitRect.dst_rect.x = frameBufferRect.X; // 0;
+					blitRect.dst_rect.y = frameBufferRect.Y; //0;
+					blitRect.dst_rect.w = frameBufferRect.Width; //configex.dst_para.width;
+					blitRect.dst_rect.h = frameBufferRect.Height; //configex.dst_para.height;
 
 					io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
 					if (io < 0)
@@ -476,6 +489,7 @@ int main(int argc, char** argv)
 
 #if 1
 			// OSD blit
+			configex = { 0 };
 
 			switch (fb0.BitsPerPixel())
 			{
@@ -534,10 +548,10 @@ int main(int argc, char** argv)
 			blitRect.src1_rect.w = configex.src_para.width;
 			blitRect.src1_rect.h = configex.src_para.height;
 
-			blitRect.src2_rect.x = frameBufferRect.X;	//0;
-			blitRect.src2_rect.y = frameBufferRect.Y;	//0;
-			blitRect.src2_rect.w = frameBufferRect.Width; //configex.src2_para.width;
-			blitRect.src2_rect.h = frameBufferRect.Height;  //configex.src2_para.height;
+			blitRect.src2_rect.x = 	frameBufferRect.X; // 0
+			blitRect.src2_rect.y = 	frameBufferRect.Y; // 0
+			blitRect.src2_rect.w = frameBufferRect.Width; //configex.src2_para.width; //
+			blitRect.src2_rect.h = frameBufferRect.Height; //configex.src2_para.height; //
 
 			blitRect.dst_rect.x = frameBufferRect.X;	// 0;
 			blitRect.dst_rect.y = frameBufferRect.Y;	//0;
