@@ -93,5 +93,5 @@ bool FrameBuffer::GetTransparencyEnabled()
 		throw Exception("FBIOGET_VSCREENINFO failed.");
 	}
 
-	return info.transp.length == 0;
+	return info.transp.length != 0;
 }

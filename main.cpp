@@ -265,7 +265,7 @@ int main(int argc, char** argv)
 		{
 			//printf("frameBufferRect=%d,%d %dx%d\n", frameBufferRect.X, frameBufferRect.Y, frameBufferRect.Width, frameBufferRect.Height);
 
-			if (!fb0.GetTransparencyEnabled())
+			if (fb0.GetTransparencyEnabled())
 			{
 #if 1
 				// Video
@@ -332,7 +332,7 @@ int main(int argc, char** argv)
 					// ---
 					configex = { 0 };
 
-#if 0
+#if 1
 					// Clear
 					
 
@@ -438,6 +438,7 @@ int main(int argc, char** argv)
 					}
 
 					
+#if 0
 					// Blit to LCD
 					configex.src_para.mem_type = CANVAS_ALLOC;
 					configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
@@ -482,6 +483,8 @@ int main(int argc, char** argv)
 					{
 						throw Exception("GE2D_STRETCHBLIT_NOALPHA failed.");
 					}
+#endif
+
 				}
 #endif
 			}
@@ -516,15 +519,15 @@ int main(int argc, char** argv)
 			configex.src_para.width = fb0.Width();
 			configex.src_para.height = fb0.Height();
 
-			configex.src2_para.format = GE2D_FORMAT_S16_RGB_565;
-			configex.src2_para.mem_type = CANVAS_ALLOC;
-			configex.src2_para.left = 0;
-			configex.src2_para.top = 0;
-			configex.src2_para.width = fb2.Width();
-			configex.src2_para.height = fb2.Height();
-			configex.src2_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();; //videoBuffer.PhysicalAddress();
-			configex.src2_planes[0].w = configex.src2_para.width;
-			configex.src2_planes[0].h = configex.src2_para.height;
+			//configex.src2_para.format = GE2D_FORMAT_S16_RGB_565;
+			//configex.src2_para.mem_type = CANVAS_ALLOC;
+			//configex.src2_para.left = 0;
+			//configex.src2_para.top = 0;
+			//configex.src2_para.width = fb2.Width();
+			//configex.src2_para.height = fb2.Height();
+			//configex.src2_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();; //videoBuffer.PhysicalAddress();
+			//configex.src2_planes[0].w = configex.src2_para.width;
+			//configex.src2_planes[0].h = configex.src2_para.height;
 
 			configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
 			configex.dst_para.mem_type = CANVAS_ALLOC;
@@ -548,10 +551,10 @@ int main(int argc, char** argv)
 			blitRect.src1_rect.w = configex.src_para.width;
 			blitRect.src1_rect.h = configex.src_para.height;
 
-			blitRect.src2_rect.x = 	frameBufferRect.X; // 0
-			blitRect.src2_rect.y = 	frameBufferRect.Y; // 0
-			blitRect.src2_rect.w = frameBufferRect.Width; //configex.src2_para.width; //
-			blitRect.src2_rect.h = frameBufferRect.Height; //configex.src2_para.height; //
+			//blitRect.src2_rect.x = 	frameBufferRect.X; // 0
+			//blitRect.src2_rect.y = 	frameBufferRect.Y; // 0
+			//blitRect.src2_rect.w = frameBufferRect.Width; //configex.src2_para.width; //
+			//blitRect.src2_rect.h = frameBufferRect.Height; //configex.src2_para.height; //
 
 			blitRect.dst_rect.x = frameBufferRect.X;	// 0;
 			blitRect.dst_rect.y = frameBufferRect.Y;	//0;
@@ -582,11 +585,113 @@ int main(int argc, char** argv)
 
 			if (fb0.GetTransparencyEnabled())
 			{
-				io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
-			}
-			else
-			{
+				// Alpha blend framebuffer on video layer
+				configex.src2_para.format = GE2D_FORMAT_S16_RGB_565;
+				configex.src2_para.mem_type = CANVAS_ALLOC;
+				configex.src2_para.left = 0;
+				configex.src2_para.top = 0;
+				configex.src2_para.width = fb0.Width();
+				configex.src2_para.height = fb0.Height();
+				configex.src2_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
+				configex.src2_planes[0].w = configex.src2_para.width;
+				configex.src2_planes[0].h = configex.src2_para.height;
+
+				configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+				configex.dst_para.mem_type = CANVAS_ALLOC;
+				configex.dst_para.left = 0;
+				configex.dst_para.top = 0;
+				configex.dst_para.width = fb0.Width();
+				configex.dst_para.height = fb0.Height();
+				configex.dst_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
+				configex.dst_planes[0].w = configex.dst_para.width;
+				configex.dst_planes[0].h = configex.dst_para.height;
+
+				io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
+				if (io < 0)
+				{
+					throw Exception("osd GE2D_CONFIG_EX failed.\n");
+				}
+
+
+				blitRect.src1_rect.x = 0;
+				blitRect.src1_rect.y = 0;
+				blitRect.src1_rect.w = configex.src_para.width;
+				blitRect.src1_rect.h = configex.src_para.height;
+
+				blitRect.src2_rect.x = 0;
+				blitRect.src2_rect.y = 0;
+				blitRect.src2_rect.w = configex.src2_para.width;
+				blitRect.src2_rect.h = configex.src2_para.height;
+
+				blitRect.dst_rect.x = 0;
+				blitRect.dst_rect.y = 0;
+				blitRect.dst_rect.w = configex.dst_para.width;
+				blitRect.dst_rect.h = configex.dst_para.height;
+
+				/*
+				ge2d_cmd_cfg->color_blend_mode = (op >> 24) & 0xff;
+				ge2d_cmd_cfg->color_src_blend_factor = (op >> 20) & 0xf;
+				ge2d_cmd_cfg->color_dst_blend_factor = (op >> 16) & 0xf;
+				ge2d_cmd_cfg->alpha_blend_mode = (op >> 8) & 0xff;
+				ge2d_cmd_cfg->alpha_src_blend_factor = (op >>  4) & 0xf;
+				ge2d_cmd_cfg->alpha_dst_blend_factor = (op >> 0) & 0xf;
+				*/
+				blitRect.op = (OPERATION_ADD << 24) |
+					(COLOR_FACTOR_SRC_ALPHA << 20) |
+					(COLOR_FACTOR_ONE_MINUS_SRC_COLOR << 16) |
+					(OPERATION_ADD << 8) |
+					(COLOR_FACTOR_SRC_ALPHA << 4) |
+					(COLOR_FACTOR_ONE_MINUS_SRC_COLOR << 0);
+
+
 				io = ioctl(ge2d_fd, GE2D_BLEND, &blitRect);
+
+
+				// Blit video layer to LCD
+				configex.src_para.format = GE2D_FORMAT_S16_RGB_565;
+				configex.src_para.mem_type = CANVAS_ALLOC;
+				configex.src_para.left = 0;
+				configex.src_para.top = 0;
+				configex.src_para.width = fb0.Width();
+				configex.src_para.height = fb0.Height();
+				configex.src_planes[0].addr = (long unsigned int)videoBuffer.PhysicalAddress();
+				configex.src_planes[0].w = configex.src2_para.width;
+				configex.src_planes[0].h = configex.src2_para.height;
+
+				configex.dst_para.format = GE2D_FORMAT_S16_RGB_565;
+				configex.dst_para.mem_type = CANVAS_ALLOC;
+				configex.dst_para.left = 0;
+				configex.dst_para.top = 0;
+				configex.dst_para.width = fb2.Width();
+				configex.dst_para.height = fb2.Height();
+				configex.dst_planes[0].addr = (long unsigned int)fb2.PhysicalAddress();
+				configex.dst_planes[0].w = configex.dst_para.width;
+				configex.dst_planes[0].h = configex.dst_para.height;
+
+				io = ioctl(ge2d_fd, GE2D_CONFIG_EX, &configex);
+				if (io < 0)
+				{
+					throw Exception("osd GE2D_CONFIG_EX failed.\n");
+				}
+
+
+				blitRect.src1_rect.x = 0;
+				blitRect.src1_rect.y = 0;
+				blitRect.src1_rect.w = configex.src_para.width;
+				blitRect.src1_rect.h = configex.src_para.height;
+
+				blitRect.dst_rect.x = frameBufferRect.X;	// 0;
+				blitRect.dst_rect.y = frameBufferRect.Y;	//0;
+				blitRect.dst_rect.w = frameBufferRect.Width;	//fb2.Width();
+				blitRect.dst_rect.h = frameBufferRect.Height; //fb2.Height();
+
+				//printf("with video.\n");
+				//io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
+			}
+			//else
+			{
+				//printf("no video.\n");
+				io = ioctl(ge2d_fd, GE2D_STRETCHBLIT_NOALPHA, &blitRect);
 			}
 
 			if (io < 0)
